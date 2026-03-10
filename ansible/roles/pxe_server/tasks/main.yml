@@ -1,0 +1,122 @@
+---
+# ansible/roles/pxe_server/tasks/main.yml
+# Install and configure the PXE provisioning server on virbr1 (192.168.100.1):
+#   • dnsmasq  – DHCP + TFTP server
+#   • nginx    – HTTP server for large boot payloads (kernel, initrd)
+#   • iPXE     – chainloaded bootloader with embedded PXE script
+
+# ── Packages ─────────────────────────────────────────────────────────────────
+
+- name: Install PXE server packages
+  ansible.builtin.apt:
+    name:
+      - dnsmasq
+      - nginx
+      - ipxe          # provides /usr/lib/ipxe/undionly.kpxe etc.
+      - syslinux-common
+      - pxelinux
+    state: present
+    update_cache: true
+
+# ── TFTP root structure ───────────────────────────────────────────────────────
+
+- name: Create TFTP root directory
+  ansible.builtin.file:
+    path: /srv/tftp
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: "0755"
+
+- name: Create pxelinux.cfg directory
+  ansible.builtin.file:
+    path: /srv/tftp/pxelinux.cfg
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: "0755"
+
+- name: Copy iPXE chainloader to TFTP root
+  ansible.builtin.copy:
+    src: /usr/lib/ipxe/undionly.kpxe
+    dest: /srv/tftp/undionly.kpxe
+    remote_src: true
+    mode: "0644"
+
+- name: Copy pxelinux bootloader
+  ansible.builtin.copy:
+    src: /usr/lib/PXELINUX/pxelinux.0
+    dest: /srv/tftp/pxelinux.0
+    remote_src: true
+    mode: "0644"
+
+- name: Copy syslinux modules to TFTP root
+  ansible.builtin.copy:
+    src: "/usr/lib/syslinux/modules/bios/{{ item }}"
+    dest: "/srv/tftp/{{ item }}"
+    remote_src: true
+    mode: "0644"
+  loop:
+    - ldlinux.c32
+    - menu.c32
+    - libutil.c32
+    - vesamenu.c32
+
+- name: Deploy default pxelinux boot menu
+  ansible.builtin.copy:
+    src: pxelinux-default.cfg
+    dest: /srv/tftp/pxelinux.cfg/default
+    mode: "0644"
+
+# ── Nginx HTTP boot root ──────────────────────────────────────────────────────
+
+- name: Create Nginx boot files root
+  ansible.builtin.file:
+    path: /srv/boot
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+
+- name: Deploy Nginx virtual host for boot content
+  ansible.builtin.copy:
+    src: nginx-pxe.conf
+    dest: /etc/nginx/sites-available/pxe-boot.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable the PXE boot Nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/pxe-boot.conf
+    dest: /etc/nginx/sites-enabled/pxe-boot.conf
+    state: link
+  notify: Reload nginx
+
+- name: Remove default Nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+# ── dnsmasq DHCP + TFTP ───────────────────────────────────────────────────────
+
+- name: Deploy dnsmasq PXE configuration
+  ansible.builtin.copy:
+    src: dnsmasq-pxe.conf
+    dest: /etc/dnsmasq.d/pxe.conf
+    mode: "0644"
+  notify: Restart dnsmasq
+
+- name: Ensure dnsmasq is started and enabled
+  ansible.builtin.systemd:
+    name: dnsmasq
+    state: started
+    enabled: true
+
+- name: Ensure nginx is started and enabled
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+    enabled: true
+
+# ── Handlers ─────────────────────────────────────────────────────────────────

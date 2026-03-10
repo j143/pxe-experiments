@@ -1,0 +1,66 @@
+<!--
+  PXE client VM template – diskless, boots entirely via PXE
+  ────────────────────────────────────────────────────────────────────────────
+  Spin up as many of these as needed (default target: 50 simultaneous).
+  Each instance should be given a unique <name>, <uuid>, and NIC <mac>.
+
+  Resources: 1 vCPU, 512 MiB RAM, *no* OS disk.
+
+  Network: virbr2 (pxe-legacy) only.  The client broadcasts a DHCP REQUEST
+  which travels through the router VM (netem applied) to the PXE server on
+  virbr1.
+
+  Usage (create N clients with the Ansible pxe_clients role):
+    virsh define  libvirt/pxe-client-template.xml
+    virsh start   pxe-client-01
+-->
+<domain type="kvm">
+  <name>pxe-client-01</name>
+  <uuid>00000000-0000-0000-0000-000000000010</uuid>
+  <memory unit="MiB">512</memory>
+  <currentMemory unit="MiB">512</currentMemory>
+  <vcpu placement="static">1</vcpu>
+
+  <os>
+    <type arch="x86_64" machine="q35">hvm</type>
+    <!-- Boot order: network first (PXE), then disk (will be empty – triggers PXE-E32 on timeout) -->
+    <boot dev="network"/>
+    <boot dev="hd"/>
+    <bios useserial="yes" rebootTimeout="0"/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <cpu mode="host-passthrough" check="none"/>
+
+  <clock offset="utc"/>
+
+  <devices>
+    <!-- No disk device – completely diskless; relies entirely on PXE -->
+
+    <!-- NIC on virbr2 (Legacy/client network) -->
+    <interface type="network">
+      <mac address="52:54:00:bb:01:01"/>
+      <source network="pxe-legacy"/>
+      <model type="virtio"/>
+      <!-- ROM with PXE support (iPXE) -->
+      <rom enabled="yes"/>
+      <address type="pci" domain="0x0000" bus="0x01" slot="0x00" function="0x0"/>
+    </interface>
+
+    <!-- Serial console -->
+    <serial type="pty">
+      <target type="isa-serial" port="0"/>
+    </serial>
+    <console type="pty">
+      <target type="serial" port="0"/>
+    </console>
+
+    <memballoon model="virtio">
+      <address type="pci" domain="0x0000" bus="0x02" slot="0x00" function="0x0"/>
+    </memballoon>
+  </devices>
+</domain>

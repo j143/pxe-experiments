@@ -1,0 +1,26 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# Do NOT commit terraform.tfvars to source control.
+
+# Prefix for all Azure resource names
+prefix = "pxe-lab"
+
+# Azure Resource Group name
+resource_group_name = "pxe-lab-rg"
+
+# Azure region (choose one with nested-virt support, e.g. eastus2, westeurope)
+location = "eastus2"
+
+# VM size – must support nested virtualisation (v3/v4 families)
+# Standard_D8s_v3  = 8 vCPU / 32 GiB  (cost-effective default)
+# Standard_E8s_v4  = 8 vCPU / 64 GiB  (more RAM for 50+ client VMs)
+vm_size = "Standard_D8s_v3"
+
+# OS admin username
+admin_username = "azureuser"
+
+# Path to your SSH public key (used for VM login)
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Restrict SSH to your own IP address – REQUIRED: set this to your public IP/CIDR
+# Example: admin_ssh_source_cidr = "203.0.113.5/32"
+admin_ssh_source_cidr = "YOUR_IP/32"

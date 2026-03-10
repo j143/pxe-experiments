@@ -1,0 +1,58 @@
+---
+# ansible/roles/network/tasks/main.yml
+# Define and start the two isolated libvirt bridges used by the PXE lab.
+#
+#   virbr1 (pxe-core)   – VLAN 100 / Core:   PXE server + router-VM eth0
+#   virbr2 (pxe-legacy) – VLAN 200 / Legacy:  PXE clients + router-VM eth1
+
+- name: Copy libvirt network XML definitions to the host
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - src: network-virbr1.xml
+      dest: /tmp/network-virbr1.xml
+    - src: network-virbr2.xml
+      dest: /tmp/network-virbr2.xml
+
+- name: Define pxe-core network (virbr1)
+  community.libvirt.virt_net:
+    command: define
+    name: pxe-core
+    xml: "{{ lookup('file', 'network-virbr1.xml') }}"
+
+- name: Define pxe-legacy network (virbr2)
+  community.libvirt.virt_net:
+    command: define
+    name: pxe-legacy
+    xml: "{{ lookup('file', 'network-virbr2.xml') }}"
+
+- name: Start pxe-core network
+  community.libvirt.virt_net:
+    name: pxe-core
+    state: active
+
+- name: Start pxe-legacy network
+  community.libvirt.virt_net:
+    name: pxe-legacy
+    state: active
+
+- name: Set pxe-core to autostart
+  community.libvirt.virt_net:
+    name: pxe-core
+    autostart: true
+
+- name: Set pxe-legacy to autostart
+  community.libvirt.virt_net:
+    name: pxe-legacy
+    autostart: true
+
+- name: Verify bridges are present
+  ansible.builtin.command: ip link show {{ item }}
+  loop:
+    - virbr1
+    - virbr2
+  register: bridge_check
+  changed_when: false
+  failed_when: bridge_check.rc != 0

@@ -1,0 +1,61 @@
+---
+# ansible/roles/kvm/tasks/main.yml
+# Install and verify the KVM / QEMU / libvirt stack on Ubuntu 24.04.
+
+- name: Install KVM and virtualisation packages
+  ansible.builtin.apt:
+    name:
+      - qemu-kvm
+      - libvirt-daemon-system
+      - libvirt-clients
+      - virtinst
+      - bridge-utils
+      - cpu-checker
+      - python3-libvirt      # needed by community.libvirt Ansible modules
+      - python3-lxml         # needed to parse libvirt XML
+    state: present
+    update_cache: true
+
+- name: Add admin user to libvirt and kvm groups
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups:
+      - libvirt
+      - kvm
+    append: true
+
+- name: Ensure libvirtd is started and enabled
+  ansible.builtin.systemd:
+    name: libvirtd
+    state: started
+    enabled: true
+
+- name: Confirm KVM acceleration is available
+  ansible.builtin.command: kvm-ok
+  register: kvm_ok_result
+  changed_when: false
+  failed_when: "'KVM acceleration can be used' not in kvm_ok_result.stdout"
+
+- name: Load 8021q kernel module (VLAN tagging)
+  community.general.modprobe:
+    name: 8021q
+    state: present
+
+- name: Persist 8021q across reboots
+  ansible.builtin.lineinfile:
+    path: /etc/modules
+    line: 8021q
+    create: true
+    mode: "0644"
+
+- name: Disable the default libvirt NAT network
+  community.libvirt.virt_net:
+    name: default
+    state: inactive
+  ignore_errors: true
+
+- name: Remove default libvirt network from autostart
+  community.libvirt.virt_net:
+    name: default
+    autostart: false
+  ignore_errors: true

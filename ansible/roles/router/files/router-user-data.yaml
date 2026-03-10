@@ -1,0 +1,50 @@
+#cloud-config
+# ---------------------------------------------------------------------------
+# cloud-init user-data for the pxe-router Alpine Linux VM.
+# Sets static IP addresses on both interfaces and installs iptables + iproute2.
+# ---------------------------------------------------------------------------
+
+hostname: pxe-router
+
+# Create a non-root user with sudo (optional; root is used for Ansible SSH above)
+users:
+  - name: root
+    lock_passwd: false
+
+# Install required packages
+packages:
+  - iproute2   # provides tc (traffic control / netem)
+  - iptables
+  - dhcrelay   # BOOTP/DHCP relay agent
+
+# Configure static IPs on both NICs
+write_files:
+  - path: /etc/network/interfaces
+    content: |
+      auto lo
+      iface lo inet loopback
+
+      # eth0 → virbr1 (Core / provisioning side)
+      auto eth0
+      iface eth0 inet static
+        address 192.168.100.2
+        netmask 255.255.255.0
+        gateway 192.168.100.1
+
+      # eth1 → virbr2 (Legacy / client side); tc-netem applied here by Ansible
+      auto eth1
+      iface eth1 inet static
+        address 192.168.200.1
+        netmask 255.255.255.0
+
+runcmd:
+  # Bring up network interfaces
+  - ifup eth0
+  - ifup eth1
+  # Enable IP forwarding immediately
+  - sysctl -w net.ipv4.ip_forward=1
+  - echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+  # Load netem kernel module
+  - modprobe sch_netem
+  # Persist netem across reboots
+  - echo sch_netem >> /etc/modules
