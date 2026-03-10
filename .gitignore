@@ -1,0 +1,23 @@
+# Terraform state and secrets
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+
+# Ansible secrets / vault
+ansible/*.vault
+ansible/vault_pass.txt
+ansible/group_vars/all/vault.yml
+
+# VM disk images (large binaries)
+*.qcow2
+*.img
+*.iso
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.swo
+__pycache__/
+*.pyc

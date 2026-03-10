@@ -1,0 +1,18 @@
+---
+# Main Ansible playbook – configures the Azure nested-virtualisation host
+# and brings up the complete PXE lab topology.
+#
+# Run after Terraform has provisioned the host VM:
+#   ansible-playbook -i inventory.ini ansible/site.yml
+
+- name: Configure nested-virtualisation host
+  hosts: pxe_host
+  become: true
+  gather_facts: true
+
+  roles:
+    - kvm        # Install / verify KVM, QEMU, libvirt
+    - network    # Define isolated libvirt bridges (virbr1, virbr2)
+    - router     # Build router-VM image, apply iptables + tc-netem
+    - pxe_server # DHCP (dnsmasq) + TFTP + Nginx HTTP boot server
+    - pxe_clients # Spin up N diskless client VMs on virbr2

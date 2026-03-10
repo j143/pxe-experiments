@@ -1,0 +1,79 @@
+<!--
+  Router VM – sits between virbr1 (Core/VLAN100) and virbr2 (Legacy/VLAN200)
+  ────────────────────────────────────────────────────────────────────────────
+  This lightweight Alpine Linux (or any small Linux distro) VM acts as the
+  inter-VLAN router.  It runs iptables MASQUERADE rules and tc-netem to
+  inject configurable packet loss and latency on the virbr2 interface,
+  allowing reproduction of PXE-E32 timeouts.
+
+  Resources: 1 vCPU, 512 MiB RAM – keep it tiny so it doesn't compete with
+  the 50 nested PXE client VMs.
+
+  Network interfaces:
+    eth0 (virbr1 / pxe-core)   – 192.168.100.2  (static, set inside the VM)
+    eth1 (virbr2 / pxe-legacy) – 192.168.200.1  (static, acts as L3 gateway)
+
+  Usage:
+    virsh define  libvirt/router-vm.xml
+    virsh start   pxe-router
+-->
+<domain type="kvm">
+  <name>pxe-router</name>
+  <uuid>00000000-0000-0000-0000-000000000001</uuid>
+  <memory unit="MiB">512</memory>
+  <currentMemory unit="MiB">512</currentMemory>
+  <vcpu placement="static">1</vcpu>
+
+  <os>
+    <type arch="x86_64" machine="q35">hvm</type>
+    <boot dev="hd"/>
+    <bootmenu enable="no"/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <cpu mode="host-passthrough" check="none"/>
+
+  <clock offset="utc"/>
+
+  <devices>
+    <!-- OS disk – points to a pre-built router image; update path as needed -->
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2" cache="none" io="native"/>
+      <source file="/var/lib/libvirt/images/pxe-router.qcow2"/>
+      <target dev="vda" bus="virtio"/>
+      <address type="pci" domain="0x0000" bus="0x04" slot="0x00" function="0x0"/>
+    </disk>
+
+    <!-- eth0 → virbr1 (Core / provisioning side) -->
+    <interface type="network">
+      <mac address="52:54:00:aa:01:01"/>
+      <source network="pxe-core"/>
+      <model type="virtio"/>
+      <address type="pci" domain="0x0000" bus="0x01" slot="0x00" function="0x0"/>
+    </interface>
+
+    <!-- eth1 → virbr2 (Legacy / client side); tc-netem applied here -->
+    <interface type="network">
+      <mac address="52:54:00:aa:01:02"/>
+      <source network="pxe-legacy"/>
+      <model type="virtio"/>
+      <address type="pci" domain="0x0000" bus="0x02" slot="0x00" function="0x0"/>
+    </interface>
+
+    <!-- Serial console for debugging without VNC -->
+    <serial type="pty">
+      <target type="isa-serial" port="0"/>
+    </serial>
+    <console type="pty">
+      <target type="serial" port="0"/>
+    </console>
+
+    <memballoon model="virtio">
+      <address type="pci" domain="0x0000" bus="0x03" slot="0x00" function="0x0"/>
+    </memballoon>
+  </devices>
+</domain>

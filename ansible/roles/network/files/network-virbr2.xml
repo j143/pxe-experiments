@@ -1,0 +1,27 @@
+<!--
+  virbr2 – VLAN 200 / Legacy client network
+  ────────────────────────────────────────────────────────────────────────────
+  A second *isolated* bridge for the PXE client VMs.  The only route out is
+  through the router VM (which also connects to virbr1) so that tc-netem
+  packet-loss and latency rules can be applied end-to-end.
+
+  Subnet: 192.168.200.0/24
+  Router (inner gateway): 192.168.200.1  (router VM leg on this bridge)
+
+  NOTE: libvirt DHCP is intentionally *not* defined here.  DHCP is served by
+  the PXE provisioning server on virbr1; the router VM relays BOOTP/DHCP
+  requests using ip helper-address / dhcp-relay behaviour.
+
+  Usage:
+    virsh net-define  libvirt/network-virbr2.xml
+    virsh net-start   pxe-legacy
+    virsh net-autostart pxe-legacy
+-->
+<network>
+  <name>pxe-legacy</name>
+  <!-- No <forward> element = completely isolated L2 domain -->
+  <bridge name="virbr2" stp="on" delay="0"/>
+  <mac address="52:54:00:02:00:00"/>
+  <!-- No DHCP block – the PXE server on virbr1 handles address assignment -->
+  <ip address="192.168.200.1" netmask="255.255.255.0"/>
+</network>

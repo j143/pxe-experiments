@@ -1,0 +1,42 @@
+#cloud-config
+# ---------------------------------------------------------------------------
+# cloud-init bootstrap for the PXE-lab nested-virtualisation host.
+# Runs once on first boot after Terraform provisions the VM.
+# ---------------------------------------------------------------------------
+
+package_update: true
+package_upgrade: true
+
+packages:
+  # KVM / QEMU / libvirt stack
+  - qemu-kvm
+  - libvirt-daemon-system
+  - libvirt-clients
+  - virtinst
+  - virt-manager
+  - bridge-utils
+  # Useful diagnostics
+  - cpu-checker
+  - net-tools
+  - iproute2
+  - tcpdump
+  - htop
+
+runcmd:
+  # Confirm nested-virt is available (prints "KVM acceleration can be used")
+  - kvm-ok || true
+  # Add the admin user to the libvirt and kvm groups
+  - usermod -aG libvirt,kvm azureuser
+  # Ensure libvirtd is enabled and running
+  - systemctl enable --now libvirtd
+  # Load 8021q module for VLAN tagging (persists across reboots via /etc/modules)
+  - modprobe 8021q
+  - echo "8021q" >> /etc/modules
+  # Disable the default libvirt NAT network — we use isolated bridges instead
+  - virsh net-destroy default || true
+  - virsh net-autostart --disable default || true
+
+final_message: |
+  PXE-lab host bootstrap complete.
+  Run the Ansible playbook to finish configuration:
+    ansible-playbook -i inventory.ini ansible/site.yml

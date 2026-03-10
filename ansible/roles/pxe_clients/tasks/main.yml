@@ -1,0 +1,59 @@
+---
+# ansible/roles/pxe_clients/tasks/main.yml
+# Spin up N diskless nested VMs on virbr2 (pxe-legacy).
+# Each VM gets a unique MAC address and immediately attempts to PXE-boot.
+# Adjust pxe_client_count in group_vars to change the number of clients.
+
+- name: Set client count (default 50)
+  ansible.builtin.set_fact:
+    pxe_client_count: "{{ pxe_client_count | default(50) | int }}"
+
+- name: Copy PXE client XML template to host
+  ansible.builtin.copy:
+    src: pxe-client-template.xml
+    dest: /tmp/pxe-client-template.xml
+    mode: "0644"
+
+- name: Generate and define each PXE client VM
+  ansible.builtin.shell: |
+    INDEX=$(printf "%02d" {{ item }})
+    VM_NAME="pxe-client-${INDEX}"
+    # Generate a deterministic MAC: 52:54:00:bb:XX:YY
+    OCTET3=$(( ({{ item }} >> 8) & 0xff ))
+    OCTET4=$(( {{ item }} & 0xff ))
+    MAC=$(printf "52:54:00:bb:%02x:%02x" ${OCTET3} ${OCTET4})
+    UUID="00000000-0000-0000-0000-$(printf '%012d' {{ item }})"
+
+    # Skip if VM already defined
+    virsh dominfo "${VM_NAME}" &>/dev/null && exit 0
+
+    sed -e "s|pxe-client-01|${VM_NAME}|g" \
+        -e "s|00000000-0000-0000-0000-000000000010|${UUID}|g" \
+        -e "s|52:54:00:bb:01:01|${MAC}|g" \
+        /tmp/pxe-client-template.xml | virsh define /dev/stdin
+  args:
+    executable: /bin/bash
+  loop: "{{ range(1, pxe_client_count | int + 1) | list }}"
+  changed_when: true
+
+- name: Start all PXE client VMs
+  ansible.builtin.shell: |
+    INDEX=$(printf "%02d" {{ item }})
+    VM_NAME="pxe-client-${INDEX}"
+    STATE=$(virsh domstate "${VM_NAME}" 2>/dev/null || echo "undefined")
+    if [ "${STATE}" != "running" ]; then
+      virsh start "${VM_NAME}"
+    fi
+  args:
+    executable: /bin/bash
+  loop: "{{ range(1, pxe_client_count | int + 1) | list }}"
+  changed_when: true
+
+- name: Show running VM list
+  ansible.builtin.command: virsh list --all
+  register: vm_list
+  changed_when: false
+
+- name: Display VM list
+  ansible.builtin.debug:
+    msg: "{{ vm_list.stdout }}"
