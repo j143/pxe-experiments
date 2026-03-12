@@ -5,7 +5,7 @@
 # Alpine Linux release used for the router VM base image.
 # Update this when a new stable Alpine release is published.
 alpine_version: "3.19"
-alpine_patch_version: "3.19.1"
+alpine_patch_version: "3.19.9"
 alpine_arch: "x86_64"
 alpine_image_name: "nocloud_alpine-{{ alpine_patch_version }}-{{ alpine_arch }}-bios-cloudinit-r0.qcow2"
 alpine_base_url: "https://dl-cdn.alpinelinux.org/alpine/v{{ alpine_version }}/releases/cloud"

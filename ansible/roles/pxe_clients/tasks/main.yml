@@ -4,9 +4,9 @@
 # Each VM gets a unique MAC address and immediately attempts to PXE-boot.
 # Adjust pxe_client_count in group_vars to change the number of clients.
 
-- name: Set client count (default 50)
+- name: Set client count (default 10)
   ansible.builtin.set_fact:
-    pxe_client_count: "{{ pxe_client_count | default(50) | int }}"
+    pxe_client_count: "{{ pxe_client_count | default(10) | int }}"
 
 - name: Copy PXE client XML template to host
   ansible.builtin.copy:

@@ -1,0 +1,16 @@
+version: 2
+ethernets:
+  eth0:
+    match:
+      name: eth0
+    addresses:
+      - 192.168.100.2/24
+    gateway4: 192.168.100.1
+    nameservers:
+      addresses:
+        - 8.8.8.8
+  eth1:
+    match:
+      name: eth1
+    addresses:
+      - 192.168.200.1/24

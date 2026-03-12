@@ -30,7 +30,7 @@
   ansible.builtin.get_url:
     url: "{{ alpine_base_url }}/{{ alpine_image_name }}"
     dest: "/var/lib/libvirt/images/alpine-{{ alpine_patch_version }}-base.qcow2"
-    checksum: "sha256:{{ alpine_base_url }}/{{ alpine_image_name }}.sha256"
+    checksum: "sha512:{{ alpine_base_url }}/{{ alpine_image_name }}.sha512"
     mode: "0640"
     owner: libvirt-qemu
     group: libvirt
@@ -51,11 +51,19 @@
     dest: /tmp/router-user-data.yaml
     mode: "0644"
 
+- name: Copy router cloud-init network-config to host
+  ansible.builtin.copy:
+    src: router-network-config.yaml
+    dest: /tmp/router-network-config.yaml
+    mode: "0644"
+
 - name: Generate cloud-init seed ISO for router VM
   ansible.builtin.command:
     cmd: >
       cloud-localds /var/lib/libvirt/images/pxe-router-seed.iso
       /tmp/router-user-data.yaml
+      --network-config /tmp/router-network-config.yaml
+
     creates: /var/lib/libvirt/images/pxe-router-seed.iso
 
 # ── Define and start router VM ───────────────────────────────────────────────
@@ -83,16 +91,20 @@
     delay: 10
     timeout: 120
 
-# ── Configure routing and netem inside the router VM via delegate_to ─────────
-# Add the router VM as a dynamic host so subsequent tasks can use delegate_to.
-
 - name: Register router VM as a dynamic Ansible host
   ansible.builtin.add_host:
     name: pxe-router-vm
     ansible_host: 192.168.100.2
-    ansible_user: root
+    ansible_user: alpine
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
     groups: router_vms
+
+- name: Wait for cloud-init to finish internally
+  ansible.builtin.raw: while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 2; done
+  delegate_to: pxe-router-vm
+  become: false
+
+# ── Configure routing and netem inside the router VM via delegate_to ─────────
 
 - name: Enable IP forwarding in router VM
   ansible.posix.sysctl:
@@ -102,6 +114,7 @@
     sysctl_set: true
     reload: true
   delegate_to: pxe-router-vm
+  become: true
 
 - name: Apply iptables MASQUERADE rule (idempotent)
   ansible.builtin.iptables:
@@ -111,6 +124,7 @@
     jump: MASQUERADE
     state: present
   delegate_to: pxe-router-vm
+  become: true
 
 - name: Allow forwarding from virbr2 → virbr1 (idempotent)
   ansible.builtin.iptables:
@@ -120,6 +134,7 @@
     jump: ACCEPT
     state: present
   delegate_to: pxe-router-vm
+  become: true
 
 - name: Allow established/related return traffic virbr1 → virbr2 (idempotent)
   ansible.builtin.iptables:
@@ -132,6 +147,7 @@
     jump: ACCEPT
     state: present
   delegate_to: pxe-router-vm
+  become: true
 
 - name: Apply tc-netem rules – {{ netem_packet_loss }} packet loss + {{ netem_latency }} latency on virbr2 leg
   ansible.builtin.shell: |
@@ -145,6 +161,7 @@
   args:
     executable: /bin/bash
   delegate_to: pxe-router-vm
+  become: true
   changed_when: true
 
 - name: Verify tc-netem is active in router VM
@@ -152,6 +169,7 @@
   register: netem_status
   changed_when: false
   delegate_to: pxe-router-vm
+  become: true
 
 - name: Show tc-netem status
   ansible.builtin.debug:
