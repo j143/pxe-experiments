@@ -19,11 +19,12 @@ variable "location" {
 variable "vm_size" {
   description = <<-EOT
     Azure VM size for the host (nested-virtualization capable).
-    Standard_D8s_v3  – 8 vCPU / 32 GiB RAM  (cost-effective default)
+    Standard_D4s_v3  – 4 vCPU / 16 GiB RAM  (Azure Student Subscription default)
+    Standard_D8s_v3  – 8 vCPU / 32 GiB RAM  (cost-effective alternative)
     Standard_E8s_v4  – 8 vCPU / 64 GiB RAM  (memory-optimised alternative)
   EOT
   type        = string
-  default     = "Standard_D8s_v3"
+  default     = "Standard_D4s_v3"
 
   validation {
     condition = contains([

@@ -92,9 +92,9 @@ resource "azurerm_managed_disk" "data" {
   name                 = "${var.prefix}-data-disk"
   location             = azurerm_resource_group.pxe_lab.location
   resource_group_name  = azurerm_resource_group.pxe_lab.name
-  storage_account_type = "Premium_LRS"
-  # P20 = 512 GiB, gives ~2300 IOPS / 150 MB/s — enough for 50 concurrent boot storms
-  disk_size_gb         = 512
+  storage_account_type = "StandardSSD_LRS"
+  # 128 GiB Standard SSD - suitable for Azure Student Subscriptions
+  disk_size_gb         = 128
   create_option        = "Empty"
 }
 
@@ -119,7 +119,7 @@ resource "azurerm_linux_virtual_machine" "host" {
   os_disk {
     name                 = "${var.prefix}-os-disk"
     caching              = "ReadWrite"
-    storage_account_type = "Premium_LRS"
+    storage_account_type = "StandardSSD_LRS"
     disk_size_gb         = 128
   }
 
