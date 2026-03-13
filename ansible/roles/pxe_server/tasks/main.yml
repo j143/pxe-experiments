@@ -98,6 +98,19 @@
     state: absent
   notify: Reload nginx
 
+- name: Deploy iPXE boot script
+  ansible.builtin.copy:
+    src: boot.ipxe
+    dest: /srv/boot/boot.ipxe
+    mode: "0644"
+
+- name: Download Alpine Linux network boot payloads
+  ansible.builtin.get_url:
+    url: "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/netboot/{{ item }}"
+    dest: "/srv/boot/{{ item }}"
+    mode: "0644"
+  loop: [vmlinuz-virt, initramfs-virt, modloop-virt]
+
 # ── dnsmasq DHCP + TFTP ───────────────────────────────────────────────────────
 
 - name: Deploy dnsmasq PXE configuration

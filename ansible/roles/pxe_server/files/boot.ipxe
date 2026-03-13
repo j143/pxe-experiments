@@ -1,0 +1,28 @@
+#!ipxe
+
+set server_ip 192.168.100.254
+set base_url http://${server_ip}/boot
+
+echo "======================================================="
+echo "   iPXE Boot Menu - Experiment Mode                    "
+echo "======================================================="
+
+:menu
+menu Choose a boot option
+item alpine               Boot Alpine Linux via HTTP (Fast)
+item shell                Drop to iPXE Shell
+item reboot               Reboot VM
+choose target || goto menu
+
+:alpine
+echo Starting Alpine Linux download via HTTP (TCP)...
+kernel ${base_url}/vmlinuz-virt initrd=initramfs-virt alpine_dev=tmpfs modules=loop,squashfs modloop=${base_url}/modloop-virt
+initrd ${base_url}/initramfs-virt
+boot
+
+:shell
+shell
+goto menu
+
+:reboot
+reboot

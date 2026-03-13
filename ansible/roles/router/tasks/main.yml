@@ -26,7 +26,7 @@
     group: libvirt
     mode: "0711"
 
-- name: Download Ubuntu Linux cloud image
+- name: Download Debian Linux cloud image
   ansible.builtin.get_url:
     url: "{{ router_image_url }}"
     dest: "/var/lib/libvirt/images/{{ router_image_name }}"
