@@ -18,8 +18,9 @@
   <name>pxe-client-01</name>
   <uuid>00000000-0000-0000-0000-000000000010</uuid>
   <memory unit="MiB">512</memory>
-  <currentMemory unit="MiB">512</currentMemory>
+  <currentMemory unit="MiB">128</currentMemory>  <!-- balloon down from 512; KVM expands on demand -->
   <vcpu placement="static">1</vcpu>
+
 
   <os>
     <type arch="x86_64" machine="q35">hvm</type>

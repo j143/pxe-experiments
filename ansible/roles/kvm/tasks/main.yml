@@ -59,3 +59,70 @@
     name: default
     autostart: false
   ignore_errors: true
+
+- name: Enable IP forwarding on the physical host
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_set: true
+    reload: true
+
+- name: Allow forwarding for libvirt bridges
+  ansible.builtin.iptables:
+    chain: FORWARD
+    jump: ACCEPT
+  become: true
+
+- name: Enable MASQUERADE for virbr1 NAT
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    source: 192.168.100.0/24
+    out_interface: eth0
+    jump: MASQUERADE
+  become: true
+
+# ── Data Disk Setup (MEDIUM FIX) ─────────────────────────────────────────────
+
+- name: Check if data disk has a filesystem
+  ansible.builtin.command: blkid /dev/sdb
+  register: blkid_result
+  changed_when: false
+  failed_when: false
+
+- name: Format data disk as ext4 (only if empty)
+  ansible.builtin.command: mkfs.ext4 -L pxe-data /dev/sdb
+  when: blkid_result.rc != 0
+  become: true
+
+- name: Create mount point for data disk
+  ansible.builtin.file:
+    path: /mnt/pxe-data
+    state: directory
+    mode: "0755"
+
+- name: Mount data disk persistently
+  ansible.posix.mount:
+    path: /mnt/pxe-data
+    src: LABEL=pxe-data
+    fstype: ext4
+    opts: defaults,nofail
+    state: mounted
+  become: true
+
+- name: Ensure libvirt images directory lives on data disk
+  ansible.builtin.file:
+    path: /mnt/pxe-data/libvirt/images
+    state: directory
+    owner: libvirt-qemu
+    group: libvirt
+    mode: "0711"
+
+- name: Symlink /var/lib/libvirt/images → data disk (idempotent)
+  ansible.builtin.file:
+    src: /mnt/pxe-data/libvirt/images
+    dest: /var/lib/libvirt/images
+    state: link
+    force: true
+  become: true

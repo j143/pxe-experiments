@@ -26,21 +26,20 @@
     group: libvirt
     mode: "0711"
 
-- name: Download Alpine Linux cloud image (lightweight router base)
+- name: Download Ubuntu Linux cloud image
   ansible.builtin.get_url:
-    url: "{{ alpine_base_url }}/{{ alpine_image_name }}"
-    dest: "/var/lib/libvirt/images/alpine-{{ alpine_patch_version }}-base.qcow2"
-    checksum: "sha512:{{ alpine_base_url }}/{{ alpine_image_name }}.sha512"
+    url: "{{ router_image_url }}"
+    dest: "/var/lib/libvirt/images/{{ router_image_name }}"
     mode: "0640"
     owner: libvirt-qemu
     group: libvirt
-  register: alpine_download
+  register: router_download
 
 - name: Create router VM disk (copy-on-write overlay over base image)
   ansible.builtin.command:
     cmd: >
       qemu-img create -f qcow2 -F qcow2
-      -b /var/lib/libvirt/images/alpine-{{ alpine_patch_version }}-base.qcow2
+      -b /var/lib/libvirt/images/{{ router_image_name }}
       /var/lib/libvirt/images/pxe-router.qcow2
       4G
     creates: /var/lib/libvirt/images/pxe-router.qcow2
@@ -88,21 +87,23 @@
   ansible.builtin.wait_for:
     host: 192.168.100.2
     port: 22
-    delay: 10
-    timeout: 120
+    delay: 20
+    timeout: 300
 
 - name: Register router VM as a dynamic Ansible host
   ansible.builtin.add_host:
     name: pxe-router-vm
     ansible_host: 192.168.100.2
-    ansible_user: alpine
+    ansible_user: debian
+    ansible_python_interpreter: /usr/bin/python3
     ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
     groups: router_vms
 
 - name: Wait for cloud-init to finish internally
-  ansible.builtin.raw: while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 2; done
+  ansible.builtin.raw: while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 5; done
   delegate_to: pxe-router-vm
   become: false
+
 
 # ── Configure routing and netem inside the router VM via delegate_to ─────────
 
@@ -174,3 +175,26 @@
 - name: Show tc-netem status
   ansible.builtin.debug:
     msg: "{{ netem_status.stdout }}"
+
+- name: Install DHCP relay agent (dhcp-helper)
+  ansible.builtin.apt:
+    name: dhcp-helper
+    state: present
+    update_cache: true
+  delegate_to: pxe-router-vm
+  become: true
+
+- name: Configure and start DHCP relay
+  ansible.builtin.shell: |
+    # Listen on eth1 (client side), relay to 192.168.100.254 (host side)
+    # Using 'pkill' and restarting manually as dhcp-helper default init script might be tricky in cloud images
+    pkill dhcp-helper || true
+    /usr/sbin/dhcp-helper -s 192.168.100.254 -i eth1
+  delegate_to: pxe-router-vm
+  become: true
+  changed_when: true
+
+- name: Verify DHCP relay is running
+  ansible.builtin.command: pgrep dhcp-helper
+  delegate_to: pxe-router-vm
+  changed_when: false

@@ -5,17 +5,15 @@
 # ---------------------------------------------------------------------------
 
 hostname: pxe-router
-disable_root: false
+disable_root: true
 
-# Create a non-root user with sudo
+# Use the standard 'debian' user
 users:
-  - name: alpine
+  - name: debian
     sudo: "ALL=(ALL) NOPASSWD:ALL"
-    lock_passwd: false
+    lock_passwd: true
 
 runcmd:
-  # Install sudo and networking tools
-  - apk update && apk add sudo iptables iproute2
   # Enable IP forwarding immediately
   - sysctl -w net.ipv4.ip_forward=1
   - echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf

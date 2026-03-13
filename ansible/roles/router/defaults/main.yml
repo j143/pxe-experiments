@@ -2,13 +2,11 @@
 # ansible/roles/router/defaults/main.yml
 # Configurable defaults for the router role.
 
-# Alpine Linux release used for the router VM base image.
-# Update this when a new stable Alpine release is published.
-alpine_version: "3.19"
-alpine_patch_version: "3.19.9"
-alpine_arch: "x86_64"
-alpine_image_name: "nocloud_alpine-{{ alpine_patch_version }}-{{ alpine_arch }}-bios-cloudinit-r0.qcow2"
-alpine_base_url: "https://dl-cdn.alpinelinux.org/alpine/v{{ alpine_version }}/releases/cloud"
+# Debian Linux release used for the router VM base image.
+# Debian generic cloud images have excellent Legacy BIOS support
+# and include python3/sudo by default.
+router_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+router_image_name: "debian-12-generic-amd64.qcow2"
 
 # tc-netem impairment applied to the router VM's client-facing interface (eth1).
 # Simulates a lossy last-mile link to trigger PXE-E32 timeouts.

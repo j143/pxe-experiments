@@ -4,9 +4,29 @@
 # Each VM gets a unique MAC address and immediately attempts to PXE-boot.
 # Adjust pxe_client_count in group_vars to change the number of clients.
 
-- name: Set client count (default 10)
+- name: Set client count (default 6 — safe for D4s_v3 16GB)
   ansible.builtin.set_fact:
-    pxe_client_count: "{{ pxe_client_count | default(10) | int }}"
+    pxe_client_count: "{{ pxe_client_count | default(6) | int }}"
+
+- name: Guard — check host has enough free RAM before starting a client storm
+  ansible.builtin.shell: |
+    FREE_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+    NEEDED_MB=$(( {{ pxe_client_count }} * 512 + 2048 ))
+    if [ "$FREE_MB" -lt "$NEEDED_MB" ]; then
+      echo "ABORT: Only ${FREE_MB}MB free, need ${NEEDED_MB}MB for {{ pxe_client_count }} clients + 2GB overhead"
+      exit 1
+    fi
+    echo "OK: ${FREE_MB}MB free, ${NEEDED_MB}MB required"
+  args:
+    executable: /bin/bash
+  register: ram_check
+  changed_when: false
+  failed_when: ram_check.rc != 0
+
+- name: Show RAM availability
+  ansible.builtin.debug:
+    msg: "{{ ram_check.stdout }}"
+
 
 - name: Copy PXE client XML template to host
   ansible.builtin.copy:
@@ -22,7 +42,7 @@
     OCTET3=$(( ({{ item }} >> 8) & 0xff ))
     OCTET4=$(( {{ item }} & 0xff ))
     MAC=$(printf "52:54:00:bb:%02x:%02x" ${OCTET3} ${OCTET4})
-    UUID="00000000-0000-0000-0000-$(printf '%012d' {{ item }})"
+    UUID="00000000-0000-0000-0000-$(printf '%012d' $((100 + {{ item }} )))"
 
     # Skip if VM already defined
     virsh dominfo "${VM_NAME}" &>/dev/null && exit 0

@@ -2,15 +2,17 @@ version: 2
 ethernets:
   eth0:
     match:
-      name: eth0
+      macaddress: "52:54:00:aa:01:01"
+    set-name: eth0
     addresses:
       - 192.168.100.2/24
-    gateway4: 192.168.100.1
+    gateway4: 192.168.100.254
     nameservers:
       addresses:
         - 8.8.8.8
   eth1:
     match:
-      name: eth1
+      macaddress: "52:54:00:aa:01:02"
+    set-name: eth1
     addresses:
       - 192.168.200.1/24

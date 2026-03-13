@@ -1,26 +1,9 @@
-<!--
-  virbr1 – VLAN 100 / Core provisioning network
-  ────────────────────────────────────────────────────────────────────────────
-  This is an *isolated* bridge (no forwarding, no NAT).  Only the PXE
-  provisioning server VM and the router VM connect here.
-
-  Subnet: 192.168.100.0/24
-  Gateway / DHCP server: 192.168.100.1  (PXE server VM)
-  DHCP range for nested clients: 192.168.100.50 – 192.168.100.200
-
-  Usage:
-    virsh net-define  libvirt/network-virbr1.xml
-    virsh net-start   pxe-core
-    virsh net-autostart pxe-core
--->
 <network>
   <name>pxe-core</name>
-  <!-- No <forward> element = completely isolated L2 domain; Azure SDN cannot see this -->
+  <forward mode='nat'/>
   <bridge name="virbr1" stp="on" delay="0"/>
   <mac address="52:54:00:01:00:00"/>
-  <ip address="192.168.100.1" netmask="255.255.255.0">
-    <dhcp>
-      <range start="192.168.100.50" end="192.168.100.200"/>
-    </dhcp>
+  <!-- The bridge IP is moved to .254 to avoid clashing with the PXE server (.1) -->
+  <ip address="192.168.100.254" netmask="255.255.255.0">
   </ip>
 </network>

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VM_IP="20.230.4.213"
+VM_IP="52.167.5.152"
 VM_USER="azureuser"
 SSH_KEY="$HOME/.ssh/id_rsa"
 
@@ -36,9 +36,13 @@ ssh -o StrictHostKeyChecking=no -i "$SSH_KEY" "$VM_USER@$VM_IP" << 'EOF'
   echo "[pxe_host]" > ~/ansible/inventory_local.ini
   echo "localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3 ansible_user=azureuser" >> ~/ansible/inventory_local.ini
 
-  echo "[Azure] Wiping old router VM state if it exists..."
+  echo "[Azure] Wiping old router VM and network state..."
   sudo virsh destroy pxe-router 2>/dev/null || true
   sudo virsh undefine pxe-router 2>/dev/null || true
+  sudo virsh net-destroy pxe-core 2>/dev/null || true
+  sudo virsh net-destroy pxe-legacy 2>/dev/null || true
+  sudo virsh net-undefine pxe-core 2>/dev/null || true
+  sudo virsh net-undefine pxe-legacy 2>/dev/null || true
   sudo rm -f /var/lib/libvirt/images/pxe-router.qcow2
   sudo rm -f /var/lib/libvirt/images/pxe-router-seed.iso
   ssh-keygen -f ~/.ssh/known_hosts -R "192.168.100.2" 2>/dev/null || true
